@@ -1,0 +1,6 @@
+#!/bin/bash
+
+set -o errexit
+set -o nounset
+
+watchmedo auto-restart -d stock_management/ -p '*.py' -- celery -A stock_management worker -P threads --loglevel=info

@@ -1,0 +1,120 @@
+version: "3.9"
+
+services:
+    api:
+        build:
+            context: .
+            dockerfile: ./docker/local/django/Dockerfile
+        command: /start
+        container_name: test-cheaf-api
+        volumes:
+            - .:/app
+            - static_volume:/app/staticfiles
+            - media_volume:/app/mediafiles
+        expose:
+            - "8000"
+        env_file:
+            - ./.env.django
+            - ./.env.postgres
+        depends_on:
+            - postgres
+            - mailhog
+            - redis
+        networks:
+            - test-cheaf-network
+
+    postgres:
+        build:
+            context: .
+            dockerfile: ./docker/local/postgres/Dockerfile
+        container_name: test-cheaf-postgres
+        volumes:
+            - local_postgres_data:/var/lib/postgresql/data
+            - local_postgres_data_backups:/backups
+        env_file:
+            - ./.env.django
+            - ./.env.postgres
+        ports:
+            - "5432:5432"
+        networks:
+            - test-cheaf-network
+
+    mailhog:
+        image: mailhog/mailhog:v1.0.0
+        container_name: test-cheaf-mailhog
+        ports:
+            - "8025:8025"
+        networks:
+            - test-cheaf-network
+    
+    redis:
+        image: redis:7-alpine
+        container_name: test-cheaf-redis
+        ports:
+            - "6379:6379"
+        networks:
+            - test-cheaf-network
+
+    celery_worker:
+        build:
+            context: .
+            dockerfile: ./docker/local/django/Dockerfile
+        command: /start-celeryworker
+        container_name: test-cheaf-celery_worker
+        volumes:
+            - .:/app
+            - static_volume:/app/staticfiles
+            - media_volume:/app/mediafiles
+        env_file:
+            - ./.env.django
+            - ./.env.postgres
+        depends_on:
+            - redis
+            - postgres
+            - mailhog
+        networks:
+            - test-cheaf-network
+
+    flower:
+        build:
+            context: .
+            dockerfile: ./docker/local/django/Dockerfile
+        command: /start-flower
+        container_name: test-cheaf-flower
+        volumes:
+            - .:/app
+        env_file:
+            - ./.env.django
+            - ./.env.postgres
+        ports:
+            - "5555:5555"
+        depends_on:
+            - redis
+            - postgres
+        networks:
+            - test-cheaf-network
+
+    nginx:
+        restart: always
+        depends_on:
+            - api
+        volumes:
+            - static_volume:/app/staticfiles
+            - media_volume:/app/mediafiles
+        build:
+            context: ./docker/local/nginx
+            dockerfile: Dockerfile
+        ports:
+            - "8080:80"
+        networks:
+            - test-cheaf-network
+
+networks:
+    test-cheaf-network:
+        driver: bridge
+
+volumes:
+    local_postgres_data: {}
+    local_postgres_data_backups: {}
+    static_volume:
+    media_volume:
